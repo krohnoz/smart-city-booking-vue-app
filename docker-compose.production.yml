@@ -1,0 +1,136 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb-bilitado
+    hostname: mongodb-bilitado
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - bilitado-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet -u \"$${MONGO_INITDB_ROOT_USERNAME}\" -p \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    image: ghcr.io/eccdigital/smart-city-booking-backend:develop
+    container_name: backend-bilitado
+    hostname: backend-bilitado
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      DB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb-bilitado:27017/admin
+      PORT: 80
+      DB_NAME: ${DB_NAME}
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      FRONTEND_URL: ${FRONTEND_URL}
+      BACKEND_URL: ${BACKEND_URL}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS512}
+      CRYPTO_SECRET: ${CRYPTO_SECRET}
+      NEXTCLOUD_USERNAME: ${NEXTCLOUD_USERNAME}
+      NEXTCLOUD_PASSWORD: ${NEXTCLOUD_PASSWORD}
+      NEXTCLOUD_URL: ${NEXTCLOUD_URL}
+      INIT_ADMIN: ${INIT_ADMIN}
+      INIT_ADMIN_SECRET: ${INIT_ADMIN_SECRET}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - bilitado-network
+    ports:
+      - "8081:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend:
+    image: ghcr.io/eccdigital/smart-city-booking-vue-app:develop
+    container_name: frontend-bilitado
+    hostname: frontend-bilitado
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      VUE_APP_SERVER_BASE_URL: ${VUE_APP_SERVER_BASE_URL}
+      VUE_APP_NAME: ${VUE_APP_NAME}
+      VUE_APP_IS_PRODUCTION: "true"
+      VUE_APP_CONTACT_ADDRESS: ${VUE_APP_CONTACT_ADDRESS}
+      VUE_APP_CONTACT_URL: ${VUE_APP_CONTACT_URL}
+      VUE_APP_PRIMARY_COLOR: ${VUE_APP_PRIMARY_COLOR}
+      VUE_APP_PRIMARY_COLOR_DARK: ${VUE_APP_PRIMARY_COLOR_DARK}
+      VUE_APP_SECONDARY_COLOR: ${VUE_APP_SECONDARY_COLOR}
+      VUE_APP_SECONDARY_COLOR_DARK: ${VUE_APP_SECONDARY_COLOR_DARK}
+      VUE_APP_ACCENT_COLOR: ${VUE_APP_ACCENT_COLOR}
+      VUE_APP_ACCENT_COLOR_DARK: ${VUE_APP_ACCENT_COLOR_DARK}
+      VUE_APP_ERROR_COLOR: ${VUE_APP_ERROR_COLOR}
+      VUE_APP_ERROR_COLOR_DARK: ${VUE_APP_ERROR_COLOR_DARK}
+      VUE_APP_INFO_COLOR: ${VUE_APP_INFO_COLOR}
+      VUE_APP_INFO_COLOR_DARK: ${VUE_APP_INFO_COLOR_DARK}
+      VUE_APP_SUCCESS_COLOR: ${VUE_APP_SUCCESS_COLOR}
+      VUE_APP_SUCCESS_COLOR_DARK: ${VUE_APP_SUCCESS_COLOR_DARK}
+      VUE_APP_WARNING_COLOR: ${VUE_APP_WARNING_COLOR}
+      VUE_APP_WARNING_COLOR_DARK: ${VUE_APP_WARNING_COLOR_DARK}
+      VUE_APP_BODY_COLOR: ${VUE_APP_BODY_COLOR}
+      VUE_APP_BODY_COLOR_DARK: ${VUE_APP_BODY_COLOR_DARK}
+      VUE_APP_DARKGREY_COLOR: ${VUE_APP_DARKGREY_COLOR}
+      VUE_APP_DARKGREY_COLOR_DARK: ${VUE_APP_DARKGREY_COLOR_DARK}
+      VUE_APP_USERSNAP_API_KEY: ${VUE_APP_USERSNAP_API_KEY:-}
+    volumes:
+      - ./assets/app-logo.png:/app/app-logo.png:ro
+      - ./assets/favicon.ico:/app/favicon.ico:ro
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - bilitado-network
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  bilitado-network:
+    name: bilitado-network
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  mongodb_config:
