@@ -144,6 +144,39 @@ services:
       VUE_APP_CONTACT_URL: https://www.my-city.de/contact
 ```
 
+
+
+### Option 3 – Production Docker Compose (single host)
+
+For production deployments on one Docker host, use the provided
+`docker-compose.production.yml` and a dedicated environment file.
+
+1. Create your environment file:
+
+   ```bash
+   cp .env.production.example .env.production
+   ```
+
+2. Set all secret and URL values in `.env.production`.
+
+3. Start the stack:
+
+   ```bash
+   docker compose --env-file .env.production -f docker-compose.production.yml up -d
+   ```
+
+4. Check service health:
+
+   ```bash
+   docker compose -f docker-compose.production.yml ps
+   ```
+
+Key production defaults in this compose file:
+- MongoDB is not exposed to the host network.
+- All services are attached to the same bridge network (`bilitado-network`).
+- Log rotation is enabled to avoid unbounded log growth.
+- Frontend and backend are exposed on ports `8080` and `8081`.
+
 ---
 
 ## Local Development
